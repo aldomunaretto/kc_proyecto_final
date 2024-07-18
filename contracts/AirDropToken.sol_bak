@@ -1,0 +1,89 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.4;
+
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract Airdrop is Ownable {
+
+    address public _tokenContract;
+    uint256 public _airdropAmount;
+    // fee 1000000000000000 = 0.005 MATIC and set it 0 if no fees
+    uint256 public _fee = 0.005 ether;
+    mapping(uint256 => AirdropInfo) public airdropInfos;
+   
+
+    struct AirdropInfo {
+        uint256 id;
+        address useraddress;
+        string name;
+        string twitterId;
+        string linkedInUrl;
+        string instagramUrl;
+        string email;
+        uint256 timestamp;
+    }
+
+    uint256 public totalAirdrops;
+    event EtherTransfer(address beneficiary, uint amount);
+
+
+    constructor(address tokenContract, uint256 airdropAmount)  {
+      _tokenContract = tokenContract;
+      _airdropAmount = airdropAmount;
+    }
+
+    function dropTokens(string memory _name, string memory _twitterId, string memory _linkedInUrl, string memory _instagramUrl, string memory _email) public payable returns (bool) {
+
+        require(msg.value >= _fee, "Not enough cash");
+        require(Token(_tokenContract).balanceOf(msg.sender) < _airdropAmount);
+        require(Token(_tokenContract).transfer(msg.sender, _airdropAmount));
+        
+        uint256 airdropId = totalAirdrops++;
+        airdropInfos[airdropId] = AirdropInfo(airdropId, msg.sender, _name,_twitterId,_linkedInUrl,_instagramUrl,_email, block.timestamp);
+       
+
+        return true;
+    }
+
+    function setTokenContract(address tokenContract) external onlyOwner {
+        _tokenContract = tokenContract;
+    }
+
+    function setAirdropAmount(uint256 airdropAmount) external onlyOwner {
+        _airdropAmount = airdropAmount;
+    }
+
+    function setFee(uint256 fee) external onlyOwner {
+        _fee = fee;
+    }
+
+    function tokenBalance(address _tokenAddr) public view returns (uint256) {
+
+        return Token(_tokenAddr).balanceOf(address(this));
+    }
+
+    function withdrawTokens(address beneficiary, address _tokenAddr) public onlyOwner {
+        require(Token(_tokenAddr).transfer(beneficiary, Token(_tokenAddr).balanceOf(address(this))));
+    }
+
+    function withdrawEther(address payable beneficiary) public onlyOwner {
+        beneficiary.transfer(address(this).balance);
+    }
+
+    function contractBalance() public view returns(uint256) {
+        return address(this).balance;
+    }
+
+
+    function getAllAirdrops() external view returns (AirdropInfo[] memory) {
+        AirdropInfo[] memory _airdrops = new AirdropInfo[](totalAirdrops);
+        for (uint256 i = 0; i < totalAirdrops; i++) {
+            _airdrops[i] = airdropInfos[i];
+        }
+        return _airdrops;
+    }
+
+
+}

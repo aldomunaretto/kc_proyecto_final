@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QMF Tech</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #output, #deploymentOutput {
+            margin-top: 20px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ddd;
+            overflow-x: auto;
+        }
+        #dropZone {
+            border: 2px dashed #bbb;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            color: #bbb;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>QMF Tech Token Airdrop Administrator</h1>
+
+    <button id="connectButton">Conectar a MetaMask</button>
+    <p id="account"></p>
+
+    <div id="airdropSection" style="display:none;">
+        <div id="dropZone">Arrastra el archivo aquí</div>
+        <div id="deploymentOutput"></div>
+    </div>
+    
+    <button id="createAirdropButton" style="display:none;">Crear Airdrop</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.5.2/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        let account = "";
+        let merkleRoot = "";
+        let addresses = [];
+        let leafCount = 0;
+
+        document.getElementById('connectButton').addEventListener('click', connectMetaMask);
+        document.getElementById('createAirdropButton').addEventListener('click', async () => {
+            if (merkleRoot && leafCount) {
+                await callSetAirdropBatchFunction(merkleRoot, leafCount);
+            }
+        });
+
+        async function connectMetaMask() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                    account = accounts[0];
+                    document.getElementById('account').innerText = `Conectado: ${account}`;
+                    document.getElementById('airdropSection').style.display = 'block';
+                } catch (error) {
+                    console.error(error);
+                }
+            } else {
+                alert('MetaMask no está instalado.');
+            }
+        }
+
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#f0f0f0';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.backgroundColor = '#fff';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#fff';
+            const file = e.dataTransfer.files[0];
+            handleFile(file);
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                addresses = text.split(/\r?\n/).filter(line => line.trim() !== '');
+                if (addresses.length === 0) {
+                    document.getElementById('deploymentOutput').innerText = 'El archivo CSV está vacío o no contiene direcciones válidas.';
+                    return;
+                }
+                leafCount = addresses.length;
+                merkleRoot = createMerkleTree(addresses);
+                document.getElementById('deploymentOutput').innerHTML = `<h2>Raíz del Árbol de Merkle:</h2><pre>${merkleRoot}</pre><h2>Número de hojas:</h2><pre>${leafCount}</pre>`;
+                document.getElementById('createAirdropButton').style.display = 'block';
+            };
+            reader.readAsText(file);
+        }
+
+        function createMerkleTree(leaves) {
+            let hashedLeaves = leaves.map(leaf => hash(leaf));
+            while (hashedLeaves.length > 1) {
+                if (hashedLeaves.length % 2 !== 0) {
+                    hashedLeaves.push(hashedLeaves[hashedLeaves.length - 1]);
+                }
+                const newLevel = [];
+                for (let i = 0; i < hashedLeaves.length; i += 2) {
+                    newLevel.push(hash(hashedLeaves[i] + hashedLeaves[i + 1]));
+                }
+                hashedLeaves = newLevel;
+            }
+            return hashedLeaves[0];
+        }
+
+        function hash(data) {
+            return CryptoJS.SHA256(data).toString(CryptoJS.enc.Hex);
+        }
+
+        async function callSetAirdropBatchFunction(merkleRoot, leafCount) {
+            const abi = [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "tokenAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_rewardAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_totalAirdropSupply",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableInvalidOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "OwnableUnauthorizedAccount",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "previousOwner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32[]",
+          "name": "proof",
+          "type": "bytes32[]"
+        }
+      ],
+      "name": "claim",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "claimed",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "merkleRoots",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "recoverTokens",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "renounceOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "rewardAmount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "_merkleRoot",
+          "type": "bytes32"
+        }
+      ],
+      "name": "setAirdropBatch",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_rewardAmount",
+          "type": "uint256"
+        }
+      ],
+      "name": "setRewardAmount",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "token",
+      "outputs": [
+        {
+          "internalType": "contract NativeQMFTechToken",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalAirdropSupply",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalRewarded",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ];
+            const contractAddress = '0x...'; // Dirección del contrato AirdropQMF.sol
+
+            const web3 = new Web3(window.ethereum);
+            const airdropContract = new web3.eth.Contract(abi, contractAddress);
+
+            try {
+                await airdropContract.methods.setAirdropBatch(merkleRoot, leafCount).send({
+                    from: account,
+                    gas: 1500000,
+                    gasPrice: '30000000000'
+                });
+                document.getElementById('deploymentOutput').innerText = 'Batch de airdrop configurado exitosamente en el contrato.';
+            } catch (error) {
+                document.getElementById('deploymentOutput').innerText = `Error al configurar el batch de airdrop: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

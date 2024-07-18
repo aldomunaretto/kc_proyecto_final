@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merkle Tree & Airdrop Deployment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #output, #deploymentOutput {
+            margin-top: 20px;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border: 1px solid #ddd;
+            overflow-x: auto;
+        }
+        #dropZone {
+            border: 2px dashed #bbb;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            color: #bbb;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Merkle Tree & Airdrop Deployment</h1>
+
+    <button id="connectButton">Conectar a MetaMask</button>
+    <p id="account"></p>
+
+    <div id="airdropSection" style="display:none;">
+        <button id="deployButton">Despliega aquí tu contrato de airdrop</button>
+        <div id="dropZone">Arrastra el archivo aquí</div>
+        <input type="number" id="rewardAmount" placeholder="Monto del reward" />
+        <div id="deploymentOutput"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.5.2/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
+        let account = "";
+
+        document.getElementById('connectButton').addEventListener('click', connectMetaMask);
+        document.getElementById('deployButton').addEventListener('click', () => {
+            document.getElementById('dropZone').style.display = 'block';
+            document.getElementById('rewardAmount').style.display = 'block';
+        });
+
+        async function connectMetaMask() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                    account = accounts[0];
+                    document.getElementById('account').innerText = `Conectado: ${account}`;
+                    document.getElementById('airdropSection').style.display = 'block';
+                } catch (error) {
+                    console.error(error);
+                }
+            } else {
+                alert('MetaMask no está instalado.');
+            }
+        }
+
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#f0f0f0';
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.style.backgroundColor = '#fff';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#fff';
+            const file = e.dataTransfer.files[0];
+            handleFile(file);
+        });
+
+        async function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const text = e.target.result;
+                const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+                const addresses = lines.map(line => line.split(',')[0]);
+                const amount = document.getElementById('rewardAmount').value;
+                
+                if (addresses.length === 0 || !amount) {
+                    document.getElementById('deploymentOutput').innerText = 'El archivo CSV está vacío o no contiene direcciones válidas, o el monto del reward no está especificado.';
+                    return;
+                }
+
+                try {
+                    await deployAirdropContract(addresses, amount);
+                } catch (error) {
+                    document.getElementById('deploymentOutput').innerText = `Error al desplegar el contrato: ${error.message}`;
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function deployAirdropContract(addresses, amount) {
+            const abi = [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "tokenAddress",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_merkleRoot",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32[]",
+          "name": "proof",
+          "type": "bytes32[]"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "claim",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "claimed",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "merkleRoot",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "token",
+      "outputs": [
+        {
+          "internalType": "contract NativeQMFTechToken",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ];
+            const bytecode = '0x608060405234801561001057600080fd5b50604051610a6f380380610a6f83398181016040528101906100329190610119565b816000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550806001819055505050610159565b600080fd5b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b60006100b082610085565b9050919050565b6100c0816100a5565b81146100cb57600080fd5b50565b6000815190506100dd816100b7565b92915050565b6000819050919050565b6100f6816100e3565b811461010157600080fd5b50565b600081519050610113816100ed565b92915050565b600080604083850312156101305761012f610080565b5b600061013e858286016100ce565b925050602061014f85828601610104565b9150509250929050565b610907806101686000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c80632eb4a7ab146100515780633b4393511461006f578063c884ef831461008b578063fc0c546a146100bb575b600080fd5b6100596100d9565b6040516100669190610429565b60405180910390f35b610089600480360381019061008491906104e9565b6100df565b005b6100a560048036038101906100a091906105a7565b610323565b6040516100b291906105ef565b60405180910390f35b6100c3610343565b6040516100d09190610669565b60405180910390f35b60015481565b600260003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060009054906101000a900460ff161561016c576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610163906106e1565b60405180910390fd5b6000338260405160200161018192919061076a565b6040516020818303038152906040528051906020012090506101e7848480806020026020016040519081016040528093929190818152602001838360200280828437600081840152601f19601f8201169050808301925050505050505060015483610367565b610226576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161021d906107e2565b60405180910390fd5b6001600260003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060006101000a81548160ff02191690831515021790555060008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1663a9059cbb33846040518363ffffffff1660e01b81526004016102d9929190610820565b6020604051808303816000875af11580156102f8573d6000803e3d6000fd5b505050506040513d601f19601f8201168201806040525081019061031c9190610875565b5050505050565b60026020528060005260406000206000915054906101000a900460ff1681565b60008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b600082610374858461037e565b1490509392505050565b60008082905060005b84518110156103c3576103b4828683815181106103a7576103a66108a2565b5b60200260200101516103ce565b91508080600101915050610387565b508091505092915050565b60008183106103e6576103e182846103f9565b6103f1565b6103f083836103f9565b5b905092915050565b600082600052816020526040600020905092915050565b6000819050919050565b61042381610410565b82525050565b600060208201905061043e600083018461041a565b92915050565b600080fd5b600080fd5b600080fd5b600080fd5b600080fd5b60008083601f8401126104735761047261044e565b5b8235905067ffffffffffffffff8111156104905761048f610453565b5b6020830191508360208202830111156104ac576104ab610458565b5b9250929050565b6000819050919050565b6104c6816104b3565b81146104d157600080fd5b50565b6000813590506104e3816104bd565b92915050565b60008060006040848603121561050257610501610444565b5b600084013567ffffffffffffffff8111156105205761051f610449565b5b61052c8682870161045d565b9350935050602061053f868287016104d4565b9150509250925092565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b600061057482610549565b9050919050565b61058481610569565b811461058f57600080fd5b50565b6000813590506105a18161057b565b92915050565b6000602082840312156105bd576105bc610444565b5b60006105cb84828501610592565b91505092915050565b60008115159050919050565b6105e9816105d4565b82525050565b600060208201905061060460008301846105e0565b92915050565b6000819050919050565b600061062f61062a61062584610549565b61060a565b610549565b9050919050565b600061064182610614565b9050919050565b600061065382610636565b9050919050565b61066381610648565b82525050565b600060208201905061067e600083018461065a565b92915050565b600082825260208201905092915050565b7f416c726561647920636c61696d65640000000000000000000000000000000000600082015250565b60006106cb600f83610684565b91506106d682610695565b602082019050919050565b600060208201905081810360008301526106fa816106be565b9050919050565b60008160601b9050919050565b600061071982610701565b9050919050565b600061072b8261070e565b9050919050565b61074361073e82610569565b610720565b82525050565b6000819050919050565b61076461075f826104b3565b610749565b82525050565b60006107768285610732565b6014820191506107868284610753565b6020820191508190509392505050565b7f496e76616c69642070726f6f6600000000000000000000000000000000000000600082015250565b60006107cc600d83610684565b91506107d782610796565b602082019050919050565b600060208201905081810360008301526107fb816107bf565b9050919050565b61080b81610569565b82525050565b61081a816104b3565b82525050565b60006040820190506108356000830185610802565b6108426020830184610811565b9392505050565b610852816105d4565b811461085d57600080fd5b50565b60008151905061086f81610849565b92915050565b60006020828403121561088b5761088a610444565b5b600061089984828501610860565b91505092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fdfea2646970667358221220eb198b4fb56ea8e6a873243f2e1f436af0c6c76143e9ac9339982601aebcec8564736f6c63430008180033'; // Bytecode del contrato AirdropQMF.sol
+
+            const web3 = new Web3(window.ethereum);
+            const airdropContract = new web3.eth.Contract(abi);
+
+            const deployment = airdropContract.deploy({
+                data: bytecode,
+                arguments: [addresses, web3.utils.toWei(amount, 'ether')]
+            });
+
+            const newContractInstance = await deployment.send({
+                from: account,
+                gas: 1500000,
+                gasPrice: '30000000000'
+            });
+
+            document.getElementById('deploymentOutput').innerText = `Contrato desplegado en: ${newContractInstance.options.address}`;
+        }
+    </script>
+</body>
+</html>

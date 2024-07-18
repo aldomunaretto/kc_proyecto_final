@@ -1,0 +1,36 @@
+{
+  "name": "qmftech-token",
+  "version": "1.0.0",
+  "description": "QMF Tech multi-chain token contract powered by LayerZero",
+  "license": "MIT",
+  "engines": {
+    "node": "^20"
+  },
+  "scripts": {
+    "compile": "hardhat compile",
+    "format": "prettier --write .",
+    "test": "hardhat test",
+    "ts": "dotenv -- ts-node"
+  },
+  "devDependencies": {
+    "@layerzerolabs/lz-evm-oapp-v2": "2.1.18",
+    "@layerzerolabs/lz-evm-protocol-v2": "2.1.18",
+    "@layerzerolabs/lz-v2-utilities": "2.1.18",
+    "@nomicfoundation/hardhat-viem": "^2.0.0",
+    "@types/chai": "^4.3.12",
+    "@types/jest": "^29.5.12",
+    "@types/mocha": "^10.0.6",
+    "dotenv-cli": "^7.4.0",
+    "hardhat": "^2.21.0",
+    "prettier": "^3.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.2",
+    "viem": "^2.7.22"
+  },
+  "resolutions": {
+    "@openzeppelin/contracts": "5.0.2"
+  },
+  "dependencies": {
+    "merkle-tree-solidity": "^1.0.8"
+  }
+}
